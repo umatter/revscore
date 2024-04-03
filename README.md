@@ -39,9 +39,12 @@ wget -m -np -nH --cut-dirs=3 -R "index.html*" https://analytics.wikimedia.org/pu
 export INFERENCE_NAME='revscoring-editquality-goodfaith'
 export MODEL_URL='goodfaith/enwiki/20220214192144/model.bin'
 export MODEL_PATH='models/goodfaith/enwiki/20220214192144/model.bin'
-export WIKI_URL='https://api.wikimedia.org'
+export WIKI_URL='https://en.wikipedia.org'
+
 
 ```
+*NOTE: set the WIKI_URL such that it is consistent with the language version of the model!*
+
 
 ## Running the revscoring model server
 
