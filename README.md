@@ -36,7 +36,7 @@ wget -m -np -nH --cut-dirs=3 -R "index.html*" https://analytics.wikimedia.org/pu
 wget -m -np -nH --cut-dirs=3 -R "index.html*" https://analytics.wikimedia.org/published/wmf-ml-models/goodfaith/ruwiki/20220214192253/
 
 # Set environment variables
-export INFERENCE_NAME='revscoring-editquality-goodfaith'
+export INFERENCE_NAME='enwiki-goodfaith'
 export MODEL_URL='goodfaith/enwiki/20220214192144/model.bin'
 export MODEL_PATH='models/goodfaith/enwiki/20220214192144/model.bin'
 export WIKI_URL='https://en.wikipedia.org'
@@ -68,8 +68,7 @@ This will start the server on port 8080. You should see output like this:
 Then run queries like this
 
 ```
-curl localhost:8080/v1/models/enwiki-goodfaith:predict -X POST -d '{"rev_id": 345}' 
--H "Content-type: application/json"
+curl localhost:8080/v1/models/enwiki-goodfaith:predict -X POST -d '{"rev_id": 12345}' -H "Content-type: application/json"
 
 ```
 
