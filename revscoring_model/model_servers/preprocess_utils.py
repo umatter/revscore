@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 import re
 from typing import Any, Dict, Union
 
 from kserve.errors import InvalidInput
+
 
 
 def is_domain_wikipedia(event: Dict) -> bool:
@@ -95,3 +97,13 @@ def validate_json_input(inputs: Union[Dict, bytes]) -> Dict:
         except (AttributeError, json.decoder.JSONDecodeError):
             raise InvalidInput("Please verify that request input is a json dict")
     return inputs
+
+
+def _get_wiki_url():
+    if "WIKI_URL" not in os.environ:
+        raise ValueError(
+            "The environment variable WIKI_URL is not set. Please set it before running the server."
+        )
+    wiki_url = os.environ.get("WIKI_URL")
+    return wiki_url
+

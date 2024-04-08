@@ -15,7 +15,7 @@ from mwapi.errors import (
 from revscoring.errors import MissingResource, UnexpectedContentType
 from revscoring.extractors.api import Extractor, MWAPICache
 
-from decorators import elapsed_time, elapsed_time_async
+from revscoring_model.model_servers.decorators import elapsed_time, elapsed_time_async
 
 
 @elapsed_time_async

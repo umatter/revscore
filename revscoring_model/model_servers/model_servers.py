@@ -11,10 +11,10 @@ from kserve.errors import InvalidInput
 from revscoring import Model
 from revscoring.extractors import api
 from revscoring.features import trim
-
-import events, logging_utils
-from preprocess_utils import validate_json_input
-import extractor_utils
+import revscoring_model.model_servers.events as events
+import revscoring_model.model_servers.logging_utils as logging_utils
+from revscoring_model.model_servers.preprocess_utils import validate_json_input, _get_wiki_url
+import revscoring_model.model_servers.extractor_utils as extractor_utils
 
 logging.basicConfig(level=kserve.constants.KSERVE_LOGLEVEL)
 
@@ -50,7 +50,7 @@ class RevscoringModel(kserve.Model):
         self.name = name
         self.model_kind = model_kind
         self.ready = False
-        self.wiki_url = self._get_wiki_url()
+        self.wiki_url = _get_wiki_url()
         self.FEATURE_VAL_KEY = "feature_values"
         self.EXTENDED_OUTPUT_KEY = "extended_output"
         self.EVENT_KEY = "event"
@@ -79,13 +79,6 @@ class RevscoringModel(kserve.Model):
         # but it doesn't seem to work.
         logging_utils.set_log_level()
 
-    def _get_wiki_url(self):
-        if "WIKI_URL" not in os.environ:
-            raise ValueError(
-                "The environment variable WIKI_URL is not set. Please set it before running the server."
-            )
-        wiki_url = os.environ.get("WIKI_URL")
-        return wiki_url
 
     def score(self, feature_values):
         return self.model.score(feature_values)

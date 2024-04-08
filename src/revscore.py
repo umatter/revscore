@@ -1,7 +1,8 @@
 import argparse
 import logging
 
-from script_revscoring_model import ScriptRevscoringModel, RevscoringModelType
+from revscoring_model.model_servers.model_servers import RevscoringModelType
+from script_revscoring_model import ScriptRevscoringModel
 
 import asyncio
 import pandas as pd
