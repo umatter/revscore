@@ -79,5 +79,34 @@ which should return a response like this:
 ```
 
 
+## Running the Script
+
+To execute the script from the project's root directory, use the command:
+
+```bash
+python3.8 src/revscore.py --model_name <your_model_name> --model_type <model_type>
+```
+
+Required Parameters:
+
+```
+--model_name: The name you wish to assign to your model. You are free to choose any name.
+--model_type: The type of AI model you wish to use, selected from a predefined list of enums. Available options are articlequality, articletopic, draftquality, drafttopic, damaging, goodfaith,
+```
+
+Optional Parameters:
+
+```
+--csv_path: The path to the CSV file containing rev_ids. By default, the script searches for a CSV file in the root directory unless another path is specified.
+--data_dir: The directory where inferences for rev_id from the CSV are saved. If not specified, the script defaults to a data folder in the project's root directory.
+```
+
+Functionality
+
+ - Reads all rev_id identifiers from the specified CSV file.
+ - For each rev_id, if there is no existing file in the results directory (rev_id.json), the script fetches the inference for that rev_id and saves it.
+ - Fetching the inference requires sending a request to an API to obtain features for the AI model, which is accomplished through the fetch_features method.
+ - Once the features are retrieved, the script can load the AI model locally and use these features to generate an inference locally, saving the result in the designated directory (default is /data) in JSON format.
+ - The script includes try-except blocks to catch and handle errors, ensuring smooth execution.
 
 
