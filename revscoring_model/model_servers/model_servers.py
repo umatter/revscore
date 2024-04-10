@@ -1,47 +1,22 @@
-import bz2
 import logging
 import os
-from enum import Enum
 from typing import Any, Dict, Optional
 
 import aiohttp
 import kserve
 import mwapi
 from kserve.errors import InvalidInput
-from revscoring import Model
 from revscoring.extractors import api
 from revscoring.features import trim
 
 import events, logging_utils
+from common.constants import FEATURE_VAL_KEY, EXTENDED_OUTPUT_KEY, EVENT_KEY, EVENTGATE_URL, EVENTGATE_STREAM, \
+    AIOHTTP_CLIENT_TIMEOUT, TLS_CERT_BUNDLE_PATH, WIKI_HOST_ENV_VAR, MISSING_REV_ID_ERR, INVALID_REV_ID_ERR
+from common.utils import _get_wiki_url, get_model_path, score, load
 from preprocess_utils import validate_json_input
 import extractor_utils
-
+from common.enums import RevscoringModelType
 logging.basicConfig(level=kserve.constants.KSERVE_LOGLEVEL)
-
-
-class RevscoringModelType(Enum):
-    ARTICLEQUALITY = "articlequality"
-    ARTICLETOPIC = "articletopic"
-    DRAFTQUALITY = "draftquality"
-    DRAFTTOPIC = "drafttopic"
-    EDITQUALITY_DAMAGING = "damaging"
-    EDITQUALITY_GOODFAITH = "goodfaith"
-    EDITQUALITY_REVERTED = "reverted"
-    ITEMQUALITY = "itemquality"
-    ITEMTOPIC = "itemtopic"
-
-    @classmethod
-    def get_model_type(cls, inference_name: str):
-        """
-        Lookup function that searches for the model type value in the inference service name.
-        e.g. searches for 'articlequality` in `enwiki-articlequality`
-        """
-        for _, model in cls.__members__.items():
-            if model.value in inference_name:
-                return model
-        raise LookupError(
-            f"INFERENCE_NAME '{inference_name}' could not be matched to a revscoring model type."
-        )
 
 
 class RevscoringModel(kserve.Model):
@@ -50,16 +25,16 @@ class RevscoringModel(kserve.Model):
         self.name = name
         self.model_kind = model_kind
         self.ready = False
-        self.wiki_url = self._get_wiki_url()
-        self.FEATURE_VAL_KEY = "feature_values"
-        self.EXTENDED_OUTPUT_KEY = "extended_output"
-        self.EVENT_KEY = "event"
-        self.EVENTGATE_URL = os.environ.get("EVENTGATE_URL")
-        self.EVENTGATE_STREAM = os.environ.get("EVENTGATE_STREAM")
-        self.AIOHTTP_CLIENT_TIMEOUT = os.environ.get("AIOHTTP_CLIENT_TIMEOUT", 5)
+        self.wiki_url = _get_wiki_url()
+        self.FEATURE_VAL_KEY = FEATURE_VAL_KEY
+        self.EXTENDED_OUTPUT_KEY = EXTENDED_OUTPUT_KEY
+        self.EVENT_KEY = EVENT_KEY
+        self.EVENTGATE_URL = os.environ.get(EVENTGATE_URL)
+        self.EVENTGATE_STREAM = os.environ.get(EVENTGATE_STREAM)
+        self.AIOHTTP_CLIENT_TIMEOUT = os.environ.get(AIOHTTP_CLIENT_TIMEOUT, 5)
         self.CUSTOM_UA = f"WMF ML Team {model_kind.value} model svc"
         # Deployed via the wmf-certificates package
-        self.TLS_CERT_BUNDLE_PATH = "/etc/ssl/certs/wmf-ca-certificates.crt"
+        self.TLS_CERT_BUNDLE_PATH = TLS_CERT_BUNDLE_PATH
         self._http_client_session = {}
         if model_kind in [
             RevscoringModelType.EDITQUALITY_DAMAGING,
@@ -70,8 +45,8 @@ class RevscoringModel(kserve.Model):
             self.extra_mw_api_calls = True
         else:
             self.extra_mw_api_calls = False
-        self.model_path = self.get_model_path()
-        self.model = self.load()
+        self.model_path = get_model_path(model_kind=self.model_kind)
+        self.model = load(self.model_kind, self.model_path)
         self.ready = True
         self.prediction_results = None
         # FIXME: this may not be needed, in theory we could simply rely on
@@ -79,18 +54,8 @@ class RevscoringModel(kserve.Model):
         # but it doesn't seem to work.
         logging_utils.set_log_level()
 
-    def _get_wiki_url(self):
-        if "WIKI_URL" not in os.environ:
-            raise ValueError(
-                "The environment variable WIKI_URL is not set. Please set it before running the server."
-            )
-        wiki_url = os.environ.get("WIKI_URL")
-        return wiki_url
-
-    def score(self, feature_values):
-        return self.model.score(feature_values)
-
-    def fetch_features(self, rev_id, features, extractor, cache):
+    @staticmethod
+    def fetch_features(rev_id, features, extractor, cache):
         return extractor_utils.fetch_features(rev_id, features, extractor, cache)
 
     def get_http_client_session(self, endpoint):
@@ -108,22 +73,8 @@ class RevscoringModel(kserve.Model):
             )
         return self._http_client_session[endpoint]
 
-    def get_model_path(self):
-        if "MODEL_PATH" in os.environ:
-            model_path = os.environ["MODEL_PATH"]
-        elif self.model_kind == RevscoringModelType.DRAFTQUALITY:
-            model_path = "/mnt/models/model.bz2"
-        else:
-            model_path = "/mnt/models/model.bin"
-        return model_path
 
-    def load(self):
-        if self.model_kind == RevscoringModelType.DRAFTQUALITY:
-            with bz2.open(self.model_path) as f:
-                return Model.load(f)
-        else:
-            with open(self.model_path) as f:
-                return Model.load(f)
+
 
     async def get_extractor(self, inputs, rev_id):
         # The postprocess() function needs to parse the revision_create_event
@@ -131,7 +82,7 @@ class RevscoringModel(kserve.Model):
         self.revision_create_event = self.get_revision_event(inputs, self.EVENT_KEY)
         if self.revision_create_event:
             inputs["rev_id"] = rev_id
-        wiki_host = os.environ.get("WIKI_HOST")
+        wiki_host = os.environ.get(WIKI_HOST_ENV_VAR)
 
         # This is a workaround to allow the revscoring's extractor to leverage
         # aiohttp/asyncio HTTP calls. We inject a MW API cache later on in
@@ -230,14 +181,14 @@ class RevscoringModel(kserve.Model):
                 self.CUSTOM_UA,
                 self.get_http_client_session("eventgate"),
             )
-
-    def get_revision_event(self, inputs: Dict, event_input_key) -> Optional[str]:
+    @staticmethod
+    def get_revision_event(inputs: Dict, event_input_key) -> Optional[str]:
         try:
             return inputs[event_input_key]
         except KeyError:
             return None
-
-    def get_rev_id(self, inputs: Dict, event_input_key) -> Dict:
+    @staticmethod
+    def get_rev_id(inputs: Dict, event_input_key) -> Dict:
         """Get a revision id from the inputs provided.
         The revision id can be contained into an event dict
         or passed directly as value.
@@ -265,17 +216,17 @@ class RevscoringModel(kserve.Model):
             else:
                 rev_id = inputs["rev_id"]
         except KeyError:
-            logging.error("Missing rev_id in input data.")
-            raise InvalidInput('Expected "rev_id" in input data.')
+            logging.error(MISSING_REV_ID_ERR)
+            raise InvalidInput(MISSING_REV_ID_ERR)
         if not isinstance(rev_id, int):
-            logging.error("Expected rev_id to be an integer.")
-            raise InvalidInput('Expected "rev_id" to be an integer.')
+            logging.error(INVALID_REV_ID_ERR)
+            raise InvalidInput(INVALID_REV_ID_ERR)
         return rev_id
 
     async def predict(self, request: Dict, headers: Dict[str, str] = None) -> Dict:
         feature_values = request.get(self.FEATURE_VAL_KEY)
         extended_output = request.get(self.EXTENDED_OUTPUT_KEY)
-        self.prediction_results = self.score(feature_values)
+        self.prediction_results = score(self.model, feature_values)
         output = self.get_output(request, extended_output)
         await self.send_event()
         return output
