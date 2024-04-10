@@ -2,11 +2,10 @@ import bz2
 import os
 from enum import Enum
 from typing import Dict
-
 import mwapi
+import pandas as pd
 from revscoring import Model
 from revscoring.extractors.api import Extractor
-
 
 class RevscoringModelType(Enum):
     ARTICLEQUALITY = "articlequality"
@@ -61,10 +60,21 @@ class ScriptRevscoringModel:
             model_path = "/mnt/models/model.bin"
         return model_path
 
-    def fetch_features(self, rev_id, features):
+    # def fetch_features_from_local_json(self, json_path, features):
+    #     with open(json_path, 'r', encoding='utf-8') as file:
+    #         data = json.load(file)
+    #
+    #     feature_values = solve(features, context=data)
+    #     breakpoint()
+    #     return list(feature_values)
+
+    async def fetch_features(self, rev_id, features, path_to_save: str) -> None:
         extractor = Extractor(mwapi.Session(host=self._get_wiki_url(),
                                             user_agent="revscoring demo"))
-        return list(extractor.extract(rev_id, features))
+
+        values = extractor.extract(rev_id, features)
+        df = pd.DataFrame([values], columns=[str(f) for f in features])
+        df.to_csv(path_to_save, index=False)
 
     def load(self):
         if self.model_kind == RevscoringModelType.DRAFTQUALITY:
@@ -87,7 +97,20 @@ class ScriptRevscoringModel:
             output[wiki_db]["scores"][rev_id][model_name]["features"] = extended_output
         return output
 
-    async def predict(self, rev_id, features) -> Dict:
-        feature_values = self.fetch_features(rev_id=rev_id, features=features)
-        output = self.get_output(rev_id, True, results=(self.score(feature_values)))
+    @staticmethod
+    def convert(value):
+        if value.lower() == 'true':
+            return True
+        elif value.lower() == 'false':
+            return False
+        try:
+            return float(value)
+        except ValueError:
+            return value
+
+    async def predict(self, rev_id,  path_to_features: str) -> Dict:
+        df = pd.read_csv(f"{path_to_features}/{rev_id}.csv", header=None)
+
+        converted_list = [self.convert(value) for value in df.values[1]]
+        output = self.get_output(rev_id, True, results=(self.score(converted_list)))
         return output
