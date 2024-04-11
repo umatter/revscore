@@ -36,11 +36,11 @@ wget -m -np -nH --cut-dirs=3 -R "index.html*" https://analytics.wikimedia.org/pu
 wget -m -np -nH --cut-dirs=3 -R "index.html*" https://analytics.wikimedia.org/published/wmf-ml-models/goodfaith/ruwiki/20220214192253/
 
 # Set environment variables
+export PYTHONPATH="/path/to/revscore:$PYTHONPATH"
 export INFERENCE_NAME='enwiki-goodfaith'
 export MODEL_URL='goodfaith/enwiki/20220214192144/model.bin'
 export MODEL_PATH='models/goodfaith/enwiki/20220214192144/model.bin'
 export WIKI_URL='https://en.wikipedia.org'
-
 
 ```
 *NOTE: set the WIKI_URL such that it is consistent with the language version of the model!*

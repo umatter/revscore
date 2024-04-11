@@ -5,12 +5,12 @@ from distutils.util import strtobool
 from typing import Dict
 
 from kserve.errors import InferenceError
-from model_servers import RevscoringModel, RevscoringModelType
+from model_servers import RevscoringModel
 from revscoring.features import trim
-
+from common.enums import RevscoringModelType
 import process_utils
 from preprocess_utils import validate_json_input
-#from revscoring_model.model_servers import extractor_utils
+# from revscoring_model.model_servers import extractor_utils
 
 
 class RevscoringModelMP(RevscoringModel):
